@@ -190,12 +190,14 @@ class Enemy(pygame.sprite.Sprite):
                       != SYMB_FOR_GRASS):
                     continue
                 else:
-                    self.rect.x, self.rect.y = new_ways[index]
                     index_after_move = count_cell_index(new_ways[index][0],
                                                         new_ways[index][1])
                     self.board.replace_symbols_after_move(index_before_move,
                                                           index_after_move,
                                                           SYMB_FOR_ENEMY)
+                    vector_x = 1 if index_after_move[0] - index_before_move[0] > 0 else -1
+                    vector_y = 1 if index_after_move[1] - index_before_move[1] > 0 else -1
+                    self.board.enemy_move.append({self.index: [*new_ways[index], vector_x, vector_y]})
                     break
 
         if not distance_to_player_is_short:
@@ -206,11 +208,14 @@ class Enemy(pygame.sprite.Sprite):
             way = way_to_point_in_labirint(start_pos, end_pos, self.board.map_list)
             if len(way) >= 2:
                 new_index = way[-2]
-                self.rect.x = new_index[0] * CELL_SIZE['X']
-                self.rect.y = new_index[1] * CELL_SIZE['Y']
                 if self.board.map_list[new_index[1]][new_index[0]] == SYMB_FOR_PLAYER:
                     self.board.end_game(win=False)
                 else:
+                    vector_x = 1 if new_index[0] - index_before_move[0] > 0 else -1
+                    vector_y = 1 if new_index[1] - index_before_move[1] > 0 else -1
+                    self.board.enemy_move.append({self.index: [new_index[0] * CELL_SIZE['X'],
+                                                  new_index[1] * CELL_SIZE['Y'], vector_x,
+                                                  vector_y]})
                     self.board.replace_symbols_after_move(index_before_move,
                                                           new_index,
                                                           SYMB_FOR_ENEMY)
@@ -225,6 +230,7 @@ class Board:
         self.stop = False
         self.win = False
         self.exit = None
+        self.enemy_move = []
         self.shells = []
         self.enemys = []
 
@@ -350,19 +356,19 @@ class Player(pygame.sprite.Sprite):
             elif self.board.map_list[index_after_move[1]][index_after_move[0]] == SYMB_FOR_EXIT:
                 self.board.end_game(win=True)
 
-def check_player_coordinates_and_rewrite_that(board):
-    if player_move[2] > 0 and board.player.rect.x > player_move[0]:
-        board.player.rect.x = player_move[0]
-        player_move[2] = 0
-    elif player_move[2] < 0 and board.player.rect.x < player_move[0]:
-        board.player.rect.x = player_move[0]
-        player_move[2] = 0
-    if player_move[3] > 0 and board.player.rect.y > player_move[1]:
-        board.player.rect.y = player_move[1]
-        player_move[3] = 0
-    elif player_move[3] < 0 and board.player.rect.y < player_move[1]:
-        board.player.rect.y = player_move[1]
-        player_move[3] = 0
+def check_coordinates_and_rewrite_that(object, move_info):
+    if move_info[2] > 0 and object.rect.x > move_info[0]:
+        object.rect.x = move_info[0]
+        move_info[2] = 0
+    elif move_info[2] < 0 and object.rect.x < move_info[0]:
+        object.rect.x = move_info[0]
+        move_info[2] = 0
+    if move_info[3] > 0 and object.rect.y > move_info[1]:
+        object.rect.y = move_info[1]
+        move_info[3] = 0
+    elif move_info[3] < 0 and object.rect.y < move_info[1]:
+        object.rect.y = move_info[1]
+        move_info[3] = 0
 all_sprites_group = pygame.sprite.Group()
 
 board = Board(all_sprites_group, 1)
@@ -417,11 +423,18 @@ while running:
         for enemy in board.enemys:
             enemy.update((board.player.rect.x, board.player.rect.y))
             counter = 0
+    for enemy in board.enemys:
+        if enemy.index in board.enemy_move:
+            if board.enemy_move[enemy.index][2]:
+                enemy.rect.x += board.enemy_move[enemy.index][2] * enemy_speed
+            if board.enemy_move[enemy.index][3]:
+                enemy.rect.y += board.enemy_move[enemy.index][3] * enemy_speed
+            check_coordinates_and_rewrite_that(enemy, board.enemy_move[enemy.index])
     if player_move[2]:
         board.player.rect.x += player_move[2] * player_speed
     if player_move[3]:
         board.player.rect.y += player_move[3] * player_speed
-    check_player_coordinates_and_rewrite_that(board)
+    check_coordinates_and_rewrite_that(board.player, player_move)
     if board.stop:
         board.print_end_game()
     else:
