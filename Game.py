@@ -378,7 +378,7 @@ running = True
 buttons_pressed = {'ENTER': False}
 counter = 0
 player_speed = 2
-enemy_speed = 2 + board.level * 3 / 100
+enemy_speed = 1
 player_move = [0, 0, 0, 0]
 game_colors = {'RUN': (0, 255, 0), 'WIN': (200, 255, 20), 'LOSE': (150, 20, 20)}
 while running:
@@ -419,17 +419,19 @@ while running:
     if keys[pygame.K_LCTRL]:
         [print(i) for i in board.map_list]
         [print(en.index) for en in board.enemys]
-    if counter == 40:
+    if counter == 20:
         for enemy in board.enemys:
             enemy.update((board.player.rect.x, board.player.rect.y))
-            counter = 0
+        counter = 0
     for enemy in board.enemys:
-        if enemy.index in board.enemy_move:
-            if board.enemy_move[enemy.index][2]:
-                enemy.rect.x += board.enemy_move[enemy.index][2] * enemy_speed
-            if board.enemy_move[enemy.index][3]:
-                enemy.rect.y += board.enemy_move[enemy.index][3] * enemy_speed
-            check_coordinates_and_rewrite_that(enemy, board.enemy_move[enemy.index])
+        for enemy_move_info in board.enemy_move:
+            if enemy.index in enemy_move_info.keys():
+                values = list(enemy_move_info.values())[0]
+                if values[2]:
+                    enemy.rect.x += int(values[2] * enemy_speed)
+                if values[3]:
+                    enemy.rect.y += int(values[3] * enemy_speed)
+                check_coordinates_and_rewrite_that(enemy, values)
     if player_move[2]:
         board.player.rect.x += player_move[2] * player_speed
     if player_move[3]:
