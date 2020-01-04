@@ -285,11 +285,14 @@ class Board:
         font = pygame.font.Font(None, 35)
         seconds_left = (pygame.time.get_ticks() - self.start_ticks) // 1000
         seconds = self.game_duration_in_seconds - seconds_left
-        minutes, seconds = seconds // 60, seconds % 60
-        text = font.render(f'времени осталось: {minutes}:{seconds}      '
-                           f'мин осталось: {self.shell_limit - len(self.shells)}',
-                           1, (0, 0, 0))
-        screen.blit(text, ((CELL_SIZE['X'] * CELL_COUNT['X'] - text.get_width()) // 2,
+        if seconds <= 0:
+            board.end_game(False)
+        else:
+            minutes, seconds = seconds // 60, seconds % 60
+            text = font.render(f'времени осталось: {minutes}:{seconds}      '
+                               f'мин осталось: {self.shell_limit - len(self.shells)}',
+                               1, (0, 0, 0))
+            screen.blit(text, ((CELL_SIZE['X'] * CELL_COUNT['X'] - text.get_width()) // 2,
                            (CELL_SIZE['Y'] * CELL_COUNT['Y'] + 50 - text.get_height() // 2)))
 
     def print_end_game(self, screen):
