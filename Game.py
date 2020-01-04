@@ -1,12 +1,15 @@
 import pygame
 import random
+import threading
+from os import path
 
 pygame.init()
 
 CELL_SIZE = {'X': 20, 'Y': 20}
 CELL_COUNT = {'X': 31, 'Y': 31}
-SCREEN_SIZE = CELL_SIZE['X'] * CELL_COUNT['X'], CELL_SIZE['Y'] * CELL_COUNT['Y']
-screen = pygame.display.set_mode(SCREEN_SIZE)
+EXPANSION_TIME = 300  # милисекунд
+SCREEN_SIZE = CELL_SIZE['X'] * CELL_COUNT['X'], CELL_SIZE['Y'] * CELL_COUNT['Y'] + 100
+screen_for_level = pygame.display.set_mode(SCREEN_SIZE)
 clock = pygame.time.Clock()
 SYMB_FOR_WALL = '#'
 SYMB_FOR_ENEMY = 'X'
@@ -14,6 +17,16 @@ SYMB_FOR_PLAYER = '@'
 SYMB_FOR_DESTROYABLE_WALL = 'd'
 SYMB_FOR_GRASS = '.'
 SYMB_FOR_EXIT = 'E'
+
+
+def load_image(name, colorkey=None):
+    fullname = path.join('textures', name)
+    image = pygame.image.load(fullname).convert()
+    if colorkey is not None:
+        image.set_colorkey(colorkey)
+    else:
+        image = image.convert_alpha()
+    return image
 
 
 def load_level_from_file(file_name):
@@ -46,7 +59,10 @@ IMAGES = {'Enemy': None,
 
 def load_base_images(dictionary):
     enemy_image = pygame.Surface((CELL_SIZE['X'], CELL_SIZE['Y']))
-    enemy_image.fill((255, 0, 0))
+    enemy_image.fill((0, 255, 0))
+    pygame.draw.polygon(enemy_image, (255, 0, 0),
+                        [(CELL_SIZE['X'] // 2, 0), (0, CELL_SIZE['Y']),
+                         (CELL_SIZE['X'], CELL_SIZE['Y'])])
     player_image = pygame.Surface((CELL_SIZE['X'], CELL_SIZE['Y']))
     player_image.fill((0, 0, 255))
     exit_image = pygame.Surface((CELL_SIZE['X'], CELL_SIZE['Y']))
@@ -56,18 +72,20 @@ def load_base_images(dictionary):
     wall_not_destroyable_image = pygame.Surface((CELL_SIZE['X'], CELL_SIZE['Y']))
     wall_not_destroyable_image.fill((180, 180, 180))
     shell_image = pygame.Surface((CELL_SIZE['X'], CELL_SIZE['Y']))
-    rect = pygame.draw.rect(shell_image, (0, 255, 0), (0, 0, CELL_SIZE['X'], CELL_SIZE['Y']))
-    shell = pygame.draw.circle(shell_image,
-                               (0, 0, 0),
-                               (CELL_SIZE['X'] // 2,
-                                CELL_SIZE['Y'] // 2),
-                               CELL_SIZE['X'] // 2 - 2)
+    pygame.draw.rect(shell_image, (0, 255, 0), (0, 0, CELL_SIZE['X'], CELL_SIZE['Y']))
+    pygame.draw.circle(shell_image,
+                       (0, 0, 0),
+                       (CELL_SIZE['X'] // 2,
+                        CELL_SIZE['Y'] // 2),
+                       CELL_SIZE['X'] // 2 - 2)
+    expansion_image = load_image('expansion.png')
     dictionary['Enemy'] = enemy_image
     dictionary['Exit'] = exit_image
     dictionary['Wall'] = wall_not_destroyable_image
     dictionary['Wall(Destroyable)'] = wall_destroyable_image
     dictionary['Player'] = player_image
     dictionary['Shell'] = shell_image
+    dictionary['Expansion'] = expansion_image
 
 
 load_base_images(IMAGES)
@@ -81,6 +99,7 @@ def way_to_point_in_labirint(start_point_index, end_point_index, map):
     while end_point_index not in dict_of_points.keys():
         if current_points == list(dict_of_points.keys()):
             return []
+
         current_points = list(dict_of_points.keys())
         points_in_dict = list(dict_of_points.keys())
         for point in points_in_dict:
@@ -136,6 +155,19 @@ class WallBrickDestroyable(WallBrick):
         self.kill()
 
 
+class ExpansionSector(pygame.sprite.Sprite):
+    def __init__(self, x, y, group, start_ticks):
+        super().__init__(group)
+        self.start_ticks = start_ticks
+        self.image = IMAGES['Expansion']
+        self.rect = self.image.get_rect()
+        self.rect.x, self.rect.y = x, y
+
+    def update(self):
+        if pygame.time.get_ticks() - self.start_ticks > EXPANSION_TIME:
+            self.kill()
+
+
 class Exit(WallBrickDestroyable):
     def check_exit(self, player_position):
         if self.rect.x == player_position[0] and self.rect.y == player_position[1]:
@@ -147,10 +179,11 @@ class Exit(WallBrickDestroyable):
 
 
 class Shell(pygame.sprite.Sprite):
-    def __init__(self, x, y):
+    def __init__(self, x, y, index):
         super().__init__()
         self.image = IMAGES['Shell']
         self.rect = self.image.get_rect()
+        self.index = index
         self.rect.x = x
         self.rect.y = y
 
@@ -182,9 +215,9 @@ class Enemy(pygame.sprite.Sprite):
             for index in range(4):
                 index_of_new_coordinate = count_cell_index(*new_ways[index])
                 if (new_ways[index][0] < 0
-                        or new_ways[index][0] >= SCREEN_SIZE[0]
+                        or new_ways[index][0] >= CELL_SIZE['X'] * CELL_COUNT['X']
                         or new_ways[index][1] < 0
-                        or new_ways[index][1] >= SCREEN_SIZE[1]):
+                        or new_ways[index][1] >= CELL_SIZE['Y'] * CELL_COUNT['Y']):
                     continue
                 elif (self.board.map_list[index_of_new_coordinate[1]][index_of_new_coordinate[0]]
                       != SYMB_FOR_GRASS):
@@ -214,8 +247,8 @@ class Enemy(pygame.sprite.Sprite):
                     vector_x = 1 if new_index[0] - index_before_move[0] > 0 else -1
                     vector_y = 1 if new_index[1] - index_before_move[1] > 0 else -1
                     self.board.enemy_move.append({self.index: [new_index[0] * CELL_SIZE['X'],
-                                                  new_index[1] * CELL_SIZE['Y'], vector_x,
-                                                  vector_y]})
+                                                               new_index[1] * CELL_SIZE['Y'], vector_x,
+                                                               vector_y]})
                     self.board.replace_symbols_after_move(index_before_move,
                                                           new_index,
                                                           SYMB_FOR_ENEMY)
@@ -225,13 +258,21 @@ class Board:
     def __init__(self, all_sprites_group, level=1):
         self.all_sprites_group = all_sprites_group
         self.level = level
+        self.start_ticks = pygame.time.get_ticks()
         self.map_list = None
+        self.expansion = False
+        self.expansion_indexes_list = []
+        self.expansion_wave_index = 0
+        self.start_expansion = 10 ** 6
+        self.expansion_sprites = pygame.sprite.Group()
         self.player = None
         self.stop = False
         self.win = False
         self.exit = None
+        self.game_duration_in_seconds = self.level * 30 + 120
         self.enemy_move = []
-        self.shells = []
+        self.shells = {}
+        self.shell_limit = 3
         self.enemys = []
 
     def end_game(self, win=False):
@@ -240,7 +281,18 @@ class Board:
             [print(i) for i in self.map_list]
             self.win = win
 
-    def print_end_game(self):
+    def print_info_about_game(self, screen):
+        font = pygame.font.Font(None, 35)
+        seconds_left = (pygame.time.get_ticks() - self.start_ticks) // 1000
+        seconds = self.game_duration_in_seconds - seconds_left
+        minutes, seconds = seconds // 60, seconds % 60
+        text = font.render(f'времени осталось: {minutes}:{seconds}      '
+                           f'мин осталось: {self.shell_limit - len(self.shells)}',
+                           1, (0, 0, 0))
+        screen.blit(text, ((CELL_SIZE['X'] * CELL_COUNT['X'] - text.get_width()) // 2,
+                           (CELL_SIZE['Y'] * CELL_COUNT['Y'] + 50 - text.get_height() // 2)))
+
+    def print_end_game(self, screen):
         if self.stop:
             font = pygame.font.Font(None, 50)
             if self.win:
@@ -248,8 +300,8 @@ class Board:
             else:
                 text = font.render('Вы проиграли', 1, (100, 0, 255))
 
-            screen.blit(text, ((SCREEN_SIZE[0] - text.get_width()) // 2,
-                               (SCREEN_SIZE[1] - text.get_height()) // 2))
+            screen.blit(text, ((CELL_SIZE['X'] * CELL_COUNT['X'] - text.get_width()) // 2,
+                               (CELL_SIZE['Y'] * CELL_COUNT['Y'] - text.get_height()) // 2))
 
     def replace_symbols_after_move(self, index_before, index_after, type_of_creature):
         try:
@@ -258,23 +310,79 @@ class Board:
         except IndexError:
             print('Index Error')
 
-    def update_shells(self, event):
+    def update_shells(self):
         coordinates_bombs = []
-        for shell in self.shells:
-            if event != 'ALL' and shell.rect.collidepoint(event.pos):
-                coordinates_bombs.append((shell.rect.x, shell.rect.y))
-                shell.destroy()
-            elif event == 'ALL':
-                coordinates_bombs.append((shell.rect.x, shell.rect.y))
-                shell.destroy()
-        for coordinates in coordinates_bombs:
-            new_coordinates = [(coordinates[0] + i * CELL_SIZE['X'],
-                                coordinates[1]) for i in range(-5, 6)]
-            new_coordinates_two = [(coordinates[0],
-                                    coordinates[1] + i * CELL_SIZE['Y']) for i in range(-5, 6)]
-            new_coordinates.extend(new_coordinates_two)
-            for coord in new_coordinates:
-                index = count_cell_index(*coord)
+        shells_to_delete = []
+
+        def add_shell_coordinates(shell_index):
+            position = self.shells[shell_index].rect.x, self.shells[shell_index].rect.y
+            coordinates_bombs.append(position)
+            self.shells[shell_index].destroy()
+            shells_to_delete.append(shell_index)
+
+        for shell_index in self.shells:
+            add_shell_coordinates(shell_index)
+        for shell_index in shells_to_delete:
+            del self.shells[shell_index]
+
+        new_coordinates = []
+        continue_expansion = {i: {'X-1': True, 'X+1': True, 'Y-1': True, 'Y+1': True}
+                              for i in range(len(coordinates_bombs))}
+        new_coordinates.append([count_cell_index(*coord) for coord in coordinates_bombs])
+        if self.player.level == 1:
+            for i in range(1, 6):
+                new_coordinates.append([])
+
+                def check_index(index_x, index_y):
+                    if -1 < index_x < CELL_COUNT['X'] and -1 < index_y < CELL_COUNT['Y']:
+                        return True
+                    return False
+
+                def check_map_for_wall(index_x, index_y):
+                    if self.map_list[index_x][index_y] == SYMB_FOR_WALL:
+                        return True
+                    return False
+
+                for index_bomb, coordinates in enumerate(coordinates_bombs):
+                    index_of_coords = count_cell_index(*coordinates)
+                    new_indexes_on_this_step = []
+                    if continue_expansion[index_bomb]['X-1']:
+                        index_of_coords_new = (index_of_coords[0] - i, index_of_coords[1])
+                        if check_index(*index_of_coords_new):
+                            if check_map_for_wall(*index_of_coords_new):
+                                continue_expansion[index_bomb]['X-1'] = False
+                            else:
+                                new_indexes_on_this_step.append(index_of_coords_new)
+                    if continue_expansion[index_bomb]['X+1']:
+                        index_of_coords_new = (index_of_coords[0] + i, index_of_coords[1])
+                        if check_index(*index_of_coords_new):
+                            if check_map_for_wall(*index_of_coords_new):
+                                continue_expansion[index_bomb]['X+1'] = False
+                            else:
+                                new_indexes_on_this_step.append(index_of_coords_new)
+                    if continue_expansion[index_bomb]['Y-1']:
+                        index_of_coords_new = (index_of_coords[0], index_of_coords[1] - i)
+                        if check_index(*index_of_coords_new):
+                            if check_map_for_wall(*index_of_coords_new):
+                                continue_expansion[index_bomb]['Y-1'] = False
+                            else:
+                                new_indexes_on_this_step.append(index_of_coords_new)
+                    if continue_expansion[index_bomb]['Y+1']:
+                        index_of_coords_new = (index_of_coords[0], index_of_coords[1] + i)
+                        if check_index(*index_of_coords_new):
+                            if check_map_for_wall(*index_of_coords_new):
+                                continue_expansion[index_bomb]['Y+1'] = False
+                            else:
+                                new_indexes_on_this_step.append(index_of_coords_new)
+                    new_coordinates[i - 1].extend(new_indexes_on_this_step)
+        if new_coordinates:
+            self.expansion = True
+            self.expansion_indexes_list = new_coordinates
+            self.start_expansion = pygame.time.get_ticks()
+            print(pygame.time.get_ticks())
+        for step in range(len(new_coordinates)):
+            for index in new_coordinates[step]:
+                coord = index[0] * CELL_SIZE['X'], index[1] * CELL_SIZE['Y']
                 for sprite in self.all_sprites_group.sprites():
                     if isinstance(sprite, Exit):
                         if sprite.rect.x == coord[0] and sprite.rect.y == coord[1]:
@@ -330,10 +438,11 @@ class Board:
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, x, y, board):
+    def __init__(self, x, y, board, level=1):
         super().__init__()
         self.image = IMAGES['Player']
         self.board = board
+        self.level = level
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = x, y
 
@@ -356,6 +465,7 @@ class Player(pygame.sprite.Sprite):
             elif self.board.map_list[index_after_move[1]][index_after_move[0]] == SYMB_FOR_EXIT:
                 self.board.end_game(win=True)
 
+
 def check_coordinates_and_rewrite_that(object, move_info):
     if move_info[2] > 0 and object.rect.x > move_info[0]:
         object.rect.x = move_info[0]
@@ -369,16 +479,20 @@ def check_coordinates_and_rewrite_that(object, move_info):
     elif move_info[3] < 0 and object.rect.y < move_info[1]:
         object.rect.y = move_info[1]
         move_info[3] = 0
+
+
 all_sprites_group = pygame.sprite.Group()
 
 board = Board(all_sprites_group, 1)
 board.generate_new_level()
 start_game = True
 running = True
-buttons_pressed = {'ENTER': False}
+buttons_pressed = {'SPACE': False, 'RETURN': False}
 counter = 0
+shell_limit = 3
 player_speed = 2
 enemy_speed = 1
+index_to_shell = 0
 player_move = [0, 0, 0, 0]
 game_colors = {'RUN': (0, 255, 0), 'WIN': (200, 255, 20), 'LOSE': (150, 20, 20)}
 while running:
@@ -390,32 +504,61 @@ while running:
             color = game_colors['WIN']
         else:
             color = game_colors['LOSE']
-    screen.fill(color)
+    screen_for_level.fill(color)
+    if not board.stop:
+        pygame.draw.rect(screen_for_level, (150, 150, 150),
+                         [0,
+                          CELL_SIZE['Y'] * CELL_COUNT['Y'],
+                          CELL_SIZE['X'] * CELL_COUNT['X'],
+                          CELL_SIZE['Y'] * CELL_COUNT['Y'] + 100])
+    if board.expansion_sprites:
+        for sprite in board.expansion_sprites:
+            sprite.update()
+    if board.expansion:
+        print(board.expansion_indexes_list)
+        board.expansion_sprites.draw(screen_for_level)
+        if board.expansion_wave_index == 6:
+            board.expansion = False
+            board.expansion_indexes_list = []
+            board.expansion_wave_index = 0
+        else:
+            for index in board.expansion_indexes_list[board.expansion_wave_index]:
+                sprite = ExpansionSector(index[0] * CELL_SIZE['X'],
+                                         index[1] * CELL_SIZE['Y'],
+                                         board.expansion_sprites,
+                                         pygame.time.get_ticks())
+            board.expansion_wave_index += 1
+
+
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            board.update_shells(event)
     keys = pygame.key.get_pressed()
     if not player_move[2] and not player_move[3] and counter % 3 == 0:
         if keys[pygame.K_LEFT]:
-                board.player.update(-1, 0)
+            board.player.update(-1, 0)
         if keys[pygame.K_RIGHT]:
-                board.player.update(1, 0)
+            board.player.update(1, 0)
         if keys[pygame.K_UP]:
-                board.player.update(0, -1)
+            board.player.update(0, -1)
         if keys[pygame.K_DOWN]:
-                board.player.update(0, 1)
+            board.player.update(0, 1)
     if keys[pygame.K_RETURN]:
-        board.update_shells('ALL')
-    if keys[pygame.K_KP_ENTER]:
-        if not buttons_pressed['ENTER']:
-            buttons_pressed['ENTER'] = True
-            shell = Shell(board.player.rect.x, board.player.rect.y)
-            shell.add(board.all_sprites_group)
-            board.shells.append(shell)
+        if not buttons_pressed['RETURN'] and len(board.shells):
+            buttons_pressed['RETURN'] = True
+            board.update_shells()
     else:
-        buttons_pressed['ENTER'] = False
+        buttons_pressed['RETURN'] = False
+    if keys[pygame.K_SPACE]:
+        if not buttons_pressed['SPACE'] and len(board.shells) < shell_limit:
+            buttons_pressed['SPACE'] = True
+            shell = Shell(board.player.rect.x, board.player.rect.y, index_to_shell)
+            shell.add(board.all_sprites_group)
+            board.shells[index_to_shell] = shell
+            index_to_shell += 1
+    else:
+        buttons_pressed['SPACE'] = False
     if keys[pygame.K_LCTRL]:
         [print(i) for i in board.map_list]
         [print(en.index) for en in board.enemys]
@@ -438,9 +581,11 @@ while running:
         board.player.rect.y += player_move[3] * player_speed
     check_coordinates_and_rewrite_that(board.player, player_move)
     if board.stop:
-        board.print_end_game()
+        board.print_end_game(screen_for_level)
     else:
-        board.all_sprites_group.draw(screen)
+        board.expansion_sprites.draw(screen_for_level)
+        board.print_info_about_game(screen_for_level)
+        board.all_sprites_group.draw(screen_for_level)
     pygame.display.flip()
     clock.tick(100)
 
