@@ -1,6 +1,7 @@
 import pygame
 import random
 import os
+import sys
 
 pygame.init()
 
@@ -9,7 +10,7 @@ CELL_COUNT = {'X': 31, 'Y': 31}
 EXPANSION_TIME = 300  # милисекунд
 CURRENT_LEVEL_FOR_BOARD = 1
 SCREEN_SIZE_FOR_LEVEL = CELL_SIZE['X'] * CELL_COUNT['X'], CELL_SIZE['Y'] * CELL_COUNT['Y'] + 100
-CURRENT_PLAYER_LEVEL = 1
+CURRENT_PLAYER_LEVEL = '1'
 clock = pygame.time.Clock()
 SYMB_FOR_WALL = '#'
 SYMB_FOR_ENEMY = 'X'
@@ -87,50 +88,36 @@ def load_base_images(dictionary):
                        (CELL_SIZE['X'] // 2,
                         CELL_SIZE['Y'] // 2),
                        CELL_SIZE['X'] // 2 - 2)
-    expansion_image = load_image('expansion.png')
-    background_image = load_image('background.png')
-    arrow_right_image = load_image('arrow_right.png')
-    arrow_left_image = load_image('arrow_left.png')
-    arrow_top_image = load_image('arrow_top.png')
-    arrow_bottom_image = load_image('arrow_bottom.png')
-    choose_level_image = load_image('choose_level.png')
-    continue_button_lose_image = load_image('back_to_main_screen.png')
-    continue_button_win_image = load_image('back_to_main_screen_after_win.png')
-    level_1_image = load_image('level_1.png')
-    level_2_image = load_image('level_2.png')
-    level_3_image = load_image('level_3.png')
-    level_4_image = load_image('level_4.png')
-    level_5_image = load_image('level_5.png')
-    level_6_image = load_image('level_6.png')
-    level_7_image = load_image('level_7.png')
-    level_8_image = load_image('level_8.png')
-    level_9_image = load_image('level_9.png')
-    level_10_image = load_image('level_10.png')
-    dictionary['Enemy'] = enemy_image
+    dictionary['Enemy'] = load_image('animated_enemy_v3.png')
     dictionary['Exit'] = exit_image
     dictionary['Wall'] = wall_not_destroyable_image
     dictionary['Wall(Destroyable)'] = wall_destroyable_image
-    dictionary['Player'] = player_image
+    dictionary['Player'] = load_image('animated_player_v3.png')
     dictionary['Shell'] = shell_image
-    dictionary['Expansion'] = expansion_image
-    dictionary['Background'] = background_image
-    dictionary['Arrow_right'] = arrow_right_image
-    dictionary['Arrow_left'] = arrow_left_image
-    dictionary['Arrow_top'] = arrow_top_image
-    dictionary['Arrow_bottom'] = arrow_bottom_image
-    dictionary['Choose_level'] = choose_level_image
-    dictionary['level_1'] = level_1_image
-    dictionary['level_2'] = level_2_image
-    dictionary['level_3'] = level_3_image
-    dictionary['level_4'] = level_4_image
-    dictionary['level_5'] = level_5_image
-    dictionary['level_6'] = level_6_image
-    dictionary['level_7'] = level_7_image
-    dictionary['level_8'] = level_8_image
-    dictionary['level_9'] = level_9_image
-    dictionary['level_10'] = level_10_image
-    dictionary['continue_button_lose'] = continue_button_lose_image
-    dictionary['continue_button_win'] = continue_button_win_image
+    dictionary['Expansion'] = load_image('expansion.png')
+    dictionary['Background'] = load_image('background.png')
+    dictionary['Arrow_right'] = load_image('arrow_right.png')
+    dictionary['Arrow_left'] = load_image('arrow_left.png')
+    dictionary['Choose_level'] = load_image('choose_level.png')
+    dictionary['level_1'] = load_image('level_1.png')
+    dictionary['level_2'] = load_image('level_2.png')
+    dictionary['level_3'] = load_image('level_3.png')
+    dictionary['level_4'] = load_image('level_4.png')
+    dictionary['level_5'] = load_image('level_5.png')
+    dictionary['level_6'] = load_image('level_6.png')
+    dictionary['level_7'] = load_image('level_7.png')
+    dictionary['level_8'] = load_image('level_8.png')
+    dictionary['level_9'] = load_image('level_9.png')
+    dictionary['level_10'] = load_image('level_10.png')
+    dictionary['continue_button_lose'] = load_image('back_to_main_screen.png')
+    dictionary['continue_button_win'] = load_image('back_to_main_screen_after_win.png')
+    dictionary['mine_expansion_1_level'] = load_image('mine_1_level.png')
+    dictionary['mine_expansion_2_1_level'] = load_image('mine_2_1_level.png')
+    dictionary['mine_expansion_2_2_level'] = load_image('mine_2_2_level.png')
+    dictionary['mine_expansion_3_level'] = load_image('mine_3_level.png')
+    dictionary['mine_expansion_4_level'] = load_image('mine_4_level.png')
+    dictionary['mine_expansion_5_level'] = load_image('mine_5_level.png')
+    dictionary['mine_expansion_λ_level'] = load_image('mine_λ_level.png')
 
 
 load_base_images(IMAGES)
@@ -164,7 +151,8 @@ def way_to_point_in_labirint(start_point_index, end_point_index, map_list):
                         and way not in past_ways]
             for way in new_ways:
                 if (map_list[way[1]][way[0]] == SYMB_FOR_PLAYER
-                        or map_list[way[1]][way[0]] == SYMB_FOR_GRASS):
+                        or map_list[way[1]][way[0]] == SYMB_FOR_GRASS
+                        or map_list[way[1]][way[0]] == SYMB_FOR_ENEMY):
                     if way in dict_of_points.keys():
                         dict_of_points[way].append(point)
                     else:
@@ -270,12 +258,39 @@ class Shell(pygame.sprite.Sprite):
 class Enemy(pygame.sprite.Sprite):
     def __init__(self, level, x, y, board, index):
         super().__init__()
-        self.image = IMAGES['Enemy']
+        self.frames = []
+        self.cut_sheet(IMAGES['Enemy'], 12, 4)
+        self.cur_frame = 0
+        self.image = self.frames[0][self.cur_frame]
         self.level = level
         self.index = index
         self.board = board
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = x, y
+
+    def update_frame(self, x_vector, y_vector):
+        if x_vector == 1:
+            index = 2
+        elif x_vector == -1:
+            index = 1
+        elif y_vector == 1:
+            index = 0
+        elif y_vector == -1:
+            index = 3
+        if x_vector or y_vector:
+            self.cur_frame = (self.cur_frame + 1) % len(self.frames[index])
+            self.image = self.frames[index][self.cur_frame]
+
+    def cut_sheet(self, sheet, columns, rows):
+        self.rect = pygame.Rect(0, 0, sheet.get_width() // columns,
+                                sheet.get_height() // rows)
+        for row in range(rows):
+            self.frames.append([])
+            for col in range(columns):
+                frame_location = (self.rect.w * col, self.rect.h * row)
+                self.frames[-1].append(sheet.subsurface(pygame.Rect(
+                    frame_location, self.rect.size)))
+        # self.frames[0] — front [1] — left [2] — right [3] — back
 
     def update(self, player_coordinates: list) -> None:
         distance_to_player = calculate_distance(self.rect.x, self.rect.y, *player_coordinates)
@@ -328,6 +343,8 @@ class Enemy(pygame.sprite.Sprite):
                     self.board.replace_symbols_after_move(index_before_move,
                                                           new_index,
                                                           SYMB_FOR_ENEMY)
+            else:
+                random_move()
 
 
 class Board:
@@ -345,10 +362,17 @@ class Board:
         self.stop = False
         self.win = False
         self.exit = None
+        self.reload = 0
         self.game_duration_in_seconds = self.level * 30 + 120
         self.enemy_move = {}
         self.shells = {}
-        self.shell_limit = 3
+        if CURRENT_PLAYER_LEVEL == '1':
+            self.shell_limit = 3
+        elif CURRENT_PLAYER_LEVEL in ['2', '4', 'λ']:
+            self.shell_limit = 2
+        elif CURRENT_PLAYER_LEVEL in ['3', '5']:
+            self.shell_limit = 1
+        self.current_shells_possible_use = int(self.shell_limit)
         self.enemys = []
 
     def fill_enemy_move(self):
@@ -361,22 +385,41 @@ class Board:
             self.win = win
 
     def print_info_about_game(self, screen):
-        font = pygame.font.Font(None, 35)
+        font = pygame.font.Font('FreeSansBold.ttf', 26)
         seconds_left = (pygame.time.get_ticks() - self.start_ticks) // 1000
         seconds = self.game_duration_in_seconds - seconds_left
+        self.update_reload_status()
         if seconds <= 0:
             self.end_game(False)
         else:
             minutes, seconds = seconds // 60, seconds % 60
-            text = font.render(f'времени осталось: {minutes}:{seconds}      '
-                               f'мин осталось: {self.shell_limit - len(self.shells)}',
-                               1, (0, 0, 0))
+
+            if self.current_shells_possible_use:
+                text = font.render(f'времени осталось: {minutes}:{seconds}      '
+                                   f'мин осталось: {self.current_shells_possible_use}',
+                                   1, (0, 0, 0))
+            else:
+                text = font.render(f'времени осталось: {minutes}:{seconds}      '
+                                   f'перезарядка...   {self.reload - seconds_left}',
+                                   1, (0, 0, 0))
+
             screen.blit(text, ((CELL_SIZE['X'] * CELL_COUNT['X'] - text.get_width()) // 2,
                                (CELL_SIZE['Y'] * CELL_COUNT['Y'] + 50 - text.get_height() // 2)))
 
+    def start_reload(self, time):
+        seconds_left = (pygame.time.get_ticks() - self.start_ticks) // 1000
+        self.reload = seconds_left + time
+
+    def update_reload_status(self):
+        seconds_left = (pygame.time.get_ticks() - self.start_ticks) // 1000
+        if self.reload and self.reload - seconds_left <= 0:
+            self.reload = 0
+            self.current_shells_possible_use = int(self.shell_limit)
+            print(self.shell_limit)
+
     def print_end_game(self, screen):
         if self.stop:
-            font = pygame.font.Font(None, 50)
+            font = pygame.font.Font('FreeSansBold.ttf', 50)
             if self.win:
                 text = font.render('Вы победили', 1, (100, 0, 255))
             else:
@@ -394,6 +437,16 @@ class Board:
         coordinates_bombs = []
         shells_to_delete = []
 
+        def check_index(index_x, index_y):
+            if -1 < index_x < CELL_COUNT['X'] and -1 < index_y < CELL_COUNT['Y']:
+                return True
+            return False
+
+        def check_map_for_wall(index_x, index_y):
+            if self.map_list[index_x][index_y] == SYMB_FOR_WALL:
+                return True
+            return False
+
         def add_shell_coordinates(shell_index):
             position = self.shells[shell_index].rect.x, self.shells[shell_index].rect.y
             coordinates_bombs.append(position)
@@ -408,21 +461,11 @@ class Board:
         new_coordinates = []
         continue_expansion = {i: {'X-1': True, 'X+1': True, 'Y-1': True, 'Y+1': True}
                               for i in range(len(coordinates_bombs))}
-        new_coordinates.append([count_cell_index(*coord) for coord in coordinates_bombs])
-        if self.player.level == 1:
+        indexes = [count_cell_index(*coord) for coord in coordinates_bombs]
+        new_coordinates.append(indexes)
+        if self.player.level == '1':
             for i in range(1, 6):
                 new_coordinates.append([])
-
-                def check_index(index_x, index_y):
-                    if -1 < index_x < CELL_COUNT['X'] and -1 < index_y < CELL_COUNT['Y']:
-                        return True
-                    return False
-
-                def check_map_for_wall(index_x, index_y):
-                    if self.map_list[index_x][index_y] == SYMB_FOR_WALL:
-                        return True
-                    return False
-
                 for index_bomb, coordinates in enumerate(coordinates_bombs):
                     index_of_coords = count_cell_index(*coordinates)
                     new_indexes_on_this_step = []
@@ -455,6 +498,101 @@ class Board:
                             else:
                                 new_indexes_on_this_step.append(index_of_coords_new)
                     new_coordinates[i - 1].extend(new_indexes_on_this_step)
+        elif self.player.level == '2':
+            vector = random.choices(['x', 'y'], weights=[1, 1])[0]
+            if vector == 'x':
+                next_step_coords = sum([[(x, coord[1]) for x in range(CELL_COUNT['X'])]
+                                        for coord in indexes], [])
+            else:
+                next_step_coords = sum([[(coord[0], y) for y in range(CELL_COUNT['Y'])]
+                                        for coord in indexes], [])
+            new_coordinates.append([])
+            for coordinates in next_step_coords:
+                if not check_map_for_wall(*coordinates):
+                    new_coordinates[1].append(coordinates)
+        elif self.player.level == '3':
+            new_coordinates.append([])
+            for x_index, y_index in indexes:
+                for x_delta in range(-1, 2):
+                    for y_delta in range(-1, 2):
+                        cell_index = x_index + x_delta, y_index + y_delta
+                        if (not check_map_for_wall(*cell_index)
+                                and -1 < cell_index[0] < CELL_COUNT['X']
+                                and -1 < cell_index[1] < CELL_COUNT['Y']):
+                            new_coordinates[1].append(cell_index)
+        elif self.player.level == '4':
+            temporary_indexes = set()
+            new_coordinates.append([])
+            for x_index, y_index in indexes:
+                for delta in range(-5, 6):
+                    temporary_indexes.add((x_index + delta, y_index - 5))
+                    temporary_indexes.add((x_index + delta, y_index))
+                    temporary_indexes.add((x_index + delta, y_index + 5))
+                    temporary_indexes.add((x_index - 5, y_index + delta))
+                    temporary_indexes.add((x_index, y_index + delta))
+                    temporary_indexes.add((x_index + 5, y_index + delta))
+            for x_index, y_index in temporary_indexes:
+                if (-1 < x_index < CELL_COUNT['X']
+                        and -1 < y_index < CELL_COUNT['Y']
+                        and not check_map_for_wall(x_index, y_index)):
+                    new_coordinates[1].append((x_index, y_index))
+        elif self.player.level == '5':
+            temporary_indexes = set()
+            new_coordinates[0] = list()  # Мина 5 уровня в исходном квадрате 5x5 не наносит вреда
+            for num_of_squared_ring in range(6, 8):
+                for x_index, y_index in indexes:
+                    for delta in range(-5, 6):
+                        temporary_indexes.add((x_index + delta, y_index - num_of_squared_ring))
+                        temporary_indexes.add((x_index + delta, y_index + num_of_squared_ring))
+                        temporary_indexes.add((x_index - num_of_squared_ring, y_index + delta))
+                        temporary_indexes.add((x_index + num_of_squared_ring, y_index + delta))
+                for x_index, y_index in temporary_indexes:
+                    if (-1 < x_index < CELL_COUNT['X']
+                            and -1 < y_index < CELL_COUNT['Y']
+                            and not check_map_for_wall(x_index, y_index)):
+                        new_coordinates[0].append((x_index, y_index))
+        elif self.player.level == 'λ':
+            new_coordinates[0] = list()  # Мина λ уровня в исходном квадрате 3x3 не наносит вреда
+            temporary = set()
+            for bomb_coords in indexes:
+                """bottom right and left cell indexes"""
+                for delta in range(2, 16):
+                    for count in range(6):
+                        y = bomb_coords[1] + delta
+                        x_left = bomb_coords[0] - delta - 3 + count
+                        x_right = bomb_coords[0] + delta + count
+                        temporary.add((x_left, y))
+                        temporary.add((x_right, y))
+                """top cell indexes"""
+                for delta in range(5, 15):
+                    for count in range(7):
+                        y = bomb_coords[1] - delta
+                        x = bomb_coords[0] - delta // 2 - 2 + count
+                        temporary.add((x, y))
+                """pre top cell indexes"""
+                for delta in range(2, 5):
+                    for count in range(7):
+                        y = bomb_coords[1] - delta
+                        x = bomb_coords[0] - 3 + count
+                        temporary.add((x, y))
+                """center cell indexes"""
+                for delta_y in range(-1, 2):
+                    y = bomb_coords[1] + delta_y
+                    x_left_one = bomb_coords[0] - 3
+                    x_left_two = bomb_coords[0] - 2
+                    x_right_one = bomb_coords[0] + 2
+                    x_right_two = bomb_coords[0] + 3
+                    temporary.add((x_left_one, y))
+                    temporary.add((x_left_two, y))
+                    temporary.add((x_right_one, y))
+                    temporary.add((x_right_two, y))
+                """result"""
+            for x_index, y_index in temporary:
+                if (-1 < x_index < CELL_COUNT['X']
+                        and -1 < y_index < CELL_COUNT['Y']
+                        and not check_map_for_wall(x_index, y_index)):
+                    new_coordinates[0].append((x_index, y_index))
+
         if new_coordinates:
             self.expansion = True
             self.expansion_indexes_list = new_coordinates
@@ -479,6 +617,9 @@ class Board:
                                 if enemy.index == sprite.index:
                                     del self.enemys[count]
                             self.map_list[index[1]][index[0]] = SYMB_FOR_GRASS
+                    elif isinstance(sprite, Player):
+                        if sprite.rect.x == coord[0] and sprite.rect.y == coord[1]:
+                            self.end_game(False)
 
     def generate_new_level(self):
         self.map_list = load_level_from_file(f'levels\level_{self.level}.dat')
@@ -502,7 +643,10 @@ class Board:
                 elif self.map_list[row][col] == SYMB_FOR_GRASS:
                     continue
                 elif self.map_list[row][col] == SYMB_FOR_PLAYER:
-                    self.player = Player(col * CELL_SIZE['X'], row * CELL_SIZE['Y'], self)
+                    self.player = Player(col * CELL_SIZE['X'],
+                                         row * CELL_SIZE['Y'],
+                                         board=self,
+                                         level=CURRENT_PLAYER_LEVEL)
                     self.player.add(self.all_sprites_group)
         exit_index = random.randint(0, len(exits) - 1)
 
@@ -517,13 +661,40 @@ class Board:
 
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, x, y, board, level=1):
+    def __init__(self, x, y, board, level='1'):
         super().__init__()
-        self.image = IMAGES['Player']
+        self.frames = []
+        self.cut_sheet(IMAGES['Player'], 12, 4)
+        self.cur_frame = 0
+        self.image = self.frames[0][self.cur_frame]
         self.board = board
         self.level = level
         self.rect = self.image.get_rect()
         self.rect.x, self.rect.y = x, y
+
+    def cut_sheet(self, sheet, columns, rows):
+        self.rect = pygame.Rect(0, 0, sheet.get_width() // columns,
+                                sheet.get_height() // rows)
+        for row in range(rows):
+            self.frames.append([])
+            for col in range(columns):
+                frame_location = (self.rect.w * col, self.rect.h * row)
+                self.frames[-1].append(sheet.subsurface(pygame.Rect(
+                    frame_location, self.rect.size)))
+        # self.frames[0] — front [1] — left [2] — right [3] — back
+
+    def update_frame(self, x_vector, y_vector):
+        if x_vector == 1:
+            index = 2
+        elif x_vector == -1:
+            index = 1
+        elif y_vector == 1:
+            index = 0
+        elif y_vector == -1:
+            index = 3
+        if x_vector or y_vector:
+            self.cur_frame = (self.cur_frame + 1) % len(self.frames[index])
+            self.image = self.frames[index][self.cur_frame]
 
     def update(self, vector_x, vector_y, player_move):
         index_before_move = count_cell_index(self.rect.x,
@@ -532,7 +703,9 @@ class Player(pygame.sprite.Sprite):
                                             (vector_y + index_before_move[1]) * CELL_SIZE['Y'])
         if (-1 < index_after_move[0] < CELL_COUNT['X']
                 and -1 < index_after_move[1] < CELL_COUNT['Y']):
-            if self.board.map_list[index_after_move[1]][index_after_move[0]] == SYMB_FOR_GRASS:
+            symb_on_map = self.board.map_list[index_after_move[1]][index_after_move[0]]
+            if (symb_on_map == SYMB_FOR_GRASS
+                    or symb_on_map == SYMB_FOR_ENEMY):
                 player_move = [index_after_move[0] * CELL_SIZE['X'],
                                index_after_move[1] * CELL_SIZE['Y'],
                                vector_x,
@@ -546,22 +719,25 @@ class Player(pygame.sprite.Sprite):
 
 
 def start_game(level):
+    pygame.mixer.music.stop()
+    pygame.mixer.music.load('sounds/background.mp3')
+    pygame.mixer.music.play(-1)
     screen_for_level = pygame.display.set_mode(SCREEN_SIZE_FOR_LEVEL)
     all_sprites_group = pygame.sprite.Group()
     board = Board(all_sprites_group, level)
     board.generate_new_level()
     board.fill_enemy_move()
     running = True
+    result = False
     buttons_pressed = {'SPACE': False, 'RETURN': False}
     counter = 0
     button_group = pygame.sprite.Group()
-    shell_limit = 3
     player_speed = 2
     enemy_speed = 1
     index_to_shell = 0
     exit_button = None
     player_move = [0, 0, 0, 0]
-    game_colors = {'RUN': (0, 255, 0), 'WIN': (200, 255, 20), 'LOSE': (150, 20, 20)}
+    game_colors = {'RUN': (0, 255, 0), 'WIN': (255, 150, 255), 'LOSE': (150, 20, 20)}
     while running:
         counter += 1
         if not board.stop:
@@ -573,30 +749,13 @@ def start_game(level):
                 color = game_colors['LOSE']
         screen_for_level.fill(color)
         if not board.stop:
-            a = sum([i.count('@') for i in board.map_list])
-            if a > 1:
-                print(a, [print(k) for k in board.map_list])
-                print(""" \n\n""")
-            for index in board.enemy_move:
-                values = board.enemy_move[index]
-                if not values[2] and not values[3]:
-                    for enemy in board.enemys:
-                        if enemy.index == index:
-                            enemy.update((board.player.rect.x, board.player.rect.y))
-                            break
-            for enemy in board.enemys:
-                if enemy.index in board.enemy_move:
-                    values = board.enemy_move[enemy.index]
-                    if values[2]:
-                        enemy.rect.x += int(values[2] * enemy_speed)
-                    if values[3]:
-                        enemy.rect.y += int(values[3] * enemy_speed)
-                    check_coordinates_and_rewrite_that(enemy, values)
             if player_move[2]:
                 board.player.rect.x += player_move[2] * player_speed
             if player_move[3]:
                 board.player.rect.y += player_move[3] * player_speed
             check_coordinates_and_rewrite_that(board.player, player_move)
+            if counter % 2 == 0:
+                board.player.update_frame(player_move[2], player_move[3])
             pygame.draw.rect(screen_for_level, (150, 150, 150),
                              [0,
                               CELL_SIZE['Y'] * CELL_COUNT['Y'],
@@ -606,11 +765,12 @@ def start_game(level):
             if not player_move[2] and not player_move[3] and counter % 3 == 0:
                 if keys[pygame.K_LEFT]:
                     player_move = board.player.update(-1, 0, player_move)
-                if keys[pygame.K_RIGHT]:
+                # elif иначе возможно несколько вызовов update == ошибка
+                elif keys[pygame.K_RIGHT]:
                     player_move = board.player.update(1, 0, player_move)
-                if keys[pygame.K_UP]:
+                elif keys[pygame.K_UP]:
                     player_move = board.player.update(0, -1, player_move)
-                if keys[pygame.K_DOWN]:
+                elif keys[pygame.K_DOWN]:
                     player_move = board.player.update(0, 1, player_move)
             if keys[pygame.K_RETURN]:
                 if not buttons_pressed['RETURN'] and len(board.shells):
@@ -619,14 +779,46 @@ def start_game(level):
             else:
                 buttons_pressed['RETURN'] = False
             if keys[pygame.K_SPACE]:
-                if not buttons_pressed['SPACE'] and len(board.shells) < shell_limit:
+                if (not buttons_pressed['SPACE']
+                        and board.current_shells_possible_use):
                     buttons_pressed['SPACE'] = True
                     shell = Shell(board.player.rect.x, board.player.rect.y, index_to_shell)
                     shell.add(board.all_sprites_group)
                     board.shells[index_to_shell] = shell
                     index_to_shell += 1
+                    board.current_shells_possible_use -= 1
+
+                elif not board.current_shells_possible_use and not board.reload:
+                    if CURRENT_PLAYER_LEVEL in ['1']:
+                        time = 7
+                    elif CURRENT_PLAYER_LEVEL in ['2', '3']:
+                        time = 12
+                    elif CURRENT_PLAYER_LEVEL in ['4']:
+                        time = 18
+                    elif CURRENT_PLAYER_LEVEL in ['5', 'λ']:
+                        time = 30
+                    else:
+                        time = 1000
+                    board.start_reload(time)
             else:
                 buttons_pressed['SPACE'] = False
+            for index in board.enemy_move:
+                values = board.enemy_move[index]
+                if not values[2] and not values[3]:
+                    for enemy in board.enemys:
+                        if enemy.index == index:
+                            enemy.update((board.player.rect.x, board.player.rect.y))
+                            break
+            for enemy in board.enemys:
+                if enemy.index in board.enemy_move:
+                    enemy_move = board.enemy_move[enemy.index]
+                    if enemy_move[2]:
+                        enemy.rect.x += int(enemy_move[2] * enemy_speed)
+                    elif enemy_move[3]:
+                        enemy.rect.y += int(enemy_move[3] * enemy_speed)
+                    if counter % 2 == 0:
+                        enemy.update_frame(enemy_move[2], enemy_move[3])
+                    check_coordinates_and_rewrite_that(enemy, enemy_move)
             if keys[pygame.K_LCTRL]:
                 [print(i) for i in board.map_list]
                 [print(en.index) for en in board.enemys]
@@ -634,9 +826,26 @@ def start_game(level):
         if board.expansion_sprites:
             for sprite in board.expansion_sprites:
                 sprite.update()
-        if board.expansion:
+        if board.expansion and not board.stop:
             board.expansion_sprites.draw(screen_for_level)
-            if board.expansion_wave_index == 6:
+            if board.player.level == '1':
+                max_index = 6
+            elif board.player.level == '2':
+                max_index = 2
+            elif board.player.level == '3':
+                max_index = 2
+            elif board.player.level == '4':
+                max_index = 2
+            elif board.player.level == '5':
+                max_index = 1
+            elif board.player.level == 'λ':
+                max_index = 1
+            else:
+                max_index = 0
+            if board.expansion_wave_index == 1:
+                sound_of_expansion = pygame.mixer.Sound('sounds/expansion.wav')
+                sound_of_expansion.play()
+            if board.expansion_wave_index == max_index:
                 board.expansion = False
                 board.expansion_indexes_list = []
                 board.expansion_wave_index = 0
@@ -652,7 +861,6 @@ def start_game(level):
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN and board.stop:
                 if exit_button.press(event):
-                    del screen_for_level
                     running = False
             elif event.type == pygame.MOUSEBUTTONUP and board.stop:
                 exit_button.press(event)
@@ -664,6 +872,40 @@ def start_game(level):
                     image = IMAGES['continue_button_lose']
                 else:
                     image = IMAGES['continue_button_win']
+                    if not result:
+                        possibility = {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0, 'λ': 0}
+                        if board.level == 1:
+                            possibility['2'] = 1000
+                        elif board.level == 2:
+                            possibility['2'] = 2500
+                        elif board.level == 3:
+                            possibility['2'] = 3000
+                        elif board.level == 4:
+                            possibility['2'] = 3500
+                            possibility['3'] = 500
+                        elif board.level == 5:
+                            possibility['3'] = 750
+                        elif board.level == 6:
+                            possibility['3'] = 900
+                            possibility['4'] = 100
+                        elif board.level == 7:
+                            possibility['3'] = 1000
+                            possibility['4'] = 300
+                        elif board.level == 8:
+                            possibility['4'] = 400
+                        elif board.level == 9:
+                            possibility['4'] = 500
+                            possibility['5'] = 25
+                        elif board.level == 10:
+                            possibility['5'] = 75
+                            possibility['λ'] = 1
+                        lose_possibility = 10000 - sum(value for value in possibility.values())
+                        possibility['lose'] = lose_possibility
+                        result = random.choices([key for key in possibility],
+                                                weights=[value for value in possibility.values()])[0]
+                        if result != 'lose':
+                            add_new_hero_to_saves(result)
+
                 rect = image.get_rect()
                 exit_button = Button((SCREEN_SIZE_FOR_LEVEL[0] - rect.w) // 2,
                                      SCREEN_SIZE_FOR_LEVEL[1] - 100 - rect.h,
@@ -671,6 +913,16 @@ def start_game(level):
                                      button_group,
                                      lambda: go_to_start_screen())
             button_group.draw(screen_for_level)
+            if result != 'lose' and os.path.isfile('file.save') and result:
+                if result not in [code_str(value, True)
+                                  for value in
+                                  get_data_from_file('file.save').split('\n')]:
+                    font = pygame.font.Font('FreeSansBold.ttf', 25)
+                    text = font.render(f'Теперь вам доступен персонаж {result} уровня!',
+                                       1, (0, 0, 0))
+                    screen_for_level.blit(text,
+                                          ((SCREEN_SIZE_FOR_LEVEL[0] - text.get_width()) // 2,
+                                           (SCREEN_SIZE_FOR_LEVEL[1] - text.get_height()) // 2 + 150))
         else:
 
             board.expansion_sprites.draw(screen_for_level)
@@ -678,6 +930,7 @@ def start_game(level):
             board.all_sprites_group.draw(screen_for_level)
         pygame.display.flip()
         clock.tick(100)
+    pygame.mixer.music.stop()
     del screen_for_level
 
 
@@ -692,7 +945,9 @@ def add_one_in_level():
 
 
 def go_to_start_screen():
+    pygame.mixer.music.stop()
     global CURRENT_LEVEL_FOR_BOARD
+    font = pygame.font.Font('FreeSansBold.ttf', 30)
     screen = pygame.display.set_mode(SCREEN_SIZE_FOR_LEVEL)
 
     sprites = pygame.sprite.Group()
@@ -703,11 +958,27 @@ def go_to_start_screen():
                                  IMAGES['Choose_level'],
                                  sprites,
                                  lambda level: start_game(level))
-    choose_player_level_button = Button((SCREEN_SIZE_FOR_LEVEL[0] - rect_for_choose_button.w) // 2,
-                                        50,
-                                        IMAGES['Choose_level'],
+
+    text_about_choose_player_level = font.render('Выбор персонажа', 1, (0, 0, 0))
+    surface_to_choose_player_level = pygame.Surface((text_about_choose_player_level.get_width(),
+                                                     text_about_choose_player_level.get_height()))
+    surface_to_choose_player_level.fill((150, 150, 150))
+    surface_to_choose_player_level.blit(text_about_choose_player_level, (0, 0))
+    x = (SCREEN_SIZE_FOR_LEVEL[0] - text_about_choose_player_level.get_width()) // 2
+    choose_player_level_button = Button(x,
+                                        80,
+                                        surface_to_choose_player_level,
                                         sprites,
                                         lambda: change_heroes_screen())
+
+    text_about_support = font.render('Справка', 1, (0, 0, 0))
+    surface_to_support = pygame.Surface((text_about_support.get_width(),
+                                         text_about_support.get_height()))
+    surface_to_support.fill((150, 150, 150))
+    surface_to_support.blit(text_about_support, (0, 0))
+    x = (SCREEN_SIZE_FOR_LEVEL[0] - text_about_support.get_width()) // 2
+    support_button = Button(x, 20, surface_to_support, sprites, lambda: support_screen())
+
     rect_for_arrow_button = IMAGES['Arrow_right'].get_rect()
     right_button = Button(SCREEN_SIZE_FOR_LEVEL[0] - rect_for_arrow_button.w - 50,
                           (SCREEN_SIZE_FOR_LEVEL[1] - rect_for_arrow_button.h) // 2,
@@ -723,7 +994,6 @@ def go_to_start_screen():
     while running:
         screen.fill((0, 0, 0))
         screen.blit(IMAGES['Background'], (0, 0))
-        font = pygame.font.Font(None, 40)
         text = font.render(f'Уровень {CURRENT_LEVEL_FOR_BOARD}', 1, (0, 0, 0))
         screen.blit(text, ((SCREEN_SIZE_FOR_LEVEL[0] - text.get_width()) // 2,
                            SCREEN_SIZE_FOR_LEVEL[1] - 160))
@@ -734,16 +1004,17 @@ def go_to_start_screen():
                 left_button.press(event)
                 right_button.press(event)
                 if choose_player_level_button.press(event):
-                    del screen
                     running = False
                 if choose_level_button.press(event, CURRENT_LEVEL_FOR_BOARD):
-                    del screen
+                    running = False
+                if support_button.press(event):
                     running = False
             elif event.type == pygame.MOUSEBUTTONUP:
                 left_button.press(event)
                 right_button.press(event)
                 choose_player_level_button.press(event)
                 choose_level_button.press(event, CURRENT_LEVEL_FOR_BOARD)
+                support_button.press(event)
             elif event.type == pygame.QUIT:
                 running = False
         if CURRENT_LEVEL_FOR_BOARD > 10:
@@ -784,6 +1055,7 @@ def get_data_from_file(file_name):
 
 
 def change_heroes_screen():
+    pygame.mixer.music.stop()
     screen = pygame.display.set_mode(SCREEN_SIZE_FOR_LEVEL)
     global CURRENT_PLAYER_LEVEL
     changed = False
@@ -802,15 +1074,16 @@ def change_heroes_screen():
     data = get_data_from_file('file.save').split('\n')
     current_character_levels = []
     possible_characters_str = [f'персонаж{level}уровня' for level in range(1, 6)]
-    possible_characters_str.append('персонажлямбдауровня')
+    possible_characters_str.append('персонажλуровня')
     for value in data:
         decoded_value = code_str(value, decode=True)
         if decoded_value in possible_characters_str:
             current_character_levels.append(decoded_value[8:-6])
     buttons = pygame.sprite.Group()
-    font = pygame.font.Font(None, 40)
+    font = pygame.font.Font('FreeSansBold.ttf', 40)
     y = None
     counter = 0
+    info_pictures_coords = []
     for level in ['1', '2', '3', '4', '5', 'λ']:
         color = (0, 0, 0) if level.isdigit() else (255, 0, 0)
         text_about_level = font.render(f'{level} уровень', 1, color)
@@ -829,17 +1102,32 @@ def change_heroes_screen():
                           buttons,
                           lambda level: change_function(current_character_levels, level),
                           level)
+        info_pictures_coords.append((x, y))
         y += (SCREEN_SIZE_FOR_LEVEL[1] - 6 * height) // 7 + height
     running = True
     while running:
         screen.fill((0, 0, 0))
         screen.blit(IMAGES['Background'], (0, 0))
+        screen.blit(IMAGES['mine_expansion_1_level'], (info_pictures_coords[0][0] + width + 30,
+                                                       info_pictures_coords[0][1]))
+        screen.blit(IMAGES['mine_expansion_2_1_level'], (info_pictures_coords[1][0] + width + 30,
+                                                         info_pictures_coords[1][1]))
+        screen.blit(IMAGES['mine_expansion_2_2_level'], (info_pictures_coords[1][0] + width + 100,
+                                                         info_pictures_coords[1][1]))
+        screen.blit(IMAGES['mine_expansion_3_level'], (info_pictures_coords[2][0] + width + 30,
+                                                       info_pictures_coords[2][1]))
+        screen.blit(IMAGES['mine_expansion_4_level'], (info_pictures_coords[3][0] + width + 30,
+                                                       info_pictures_coords[3][1]))
+        screen.blit(IMAGES['mine_expansion_5_level'], (info_pictures_coords[4][0] + width + 30,
+                                                       info_pictures_coords[4][1]))
+        screen.blit(IMAGES['mine_expansion_λ_level'], (info_pictures_coords[5][0] + width + 30,
+                                                       info_pictures_coords[5][1]))
         buttons.draw(screen)
         if changed:
             text = font.render('Сохранено!', 1, (255, 255, 255))
-            width, height = text.get_width(), text.get_height()
-            screen.blit(text, ((SCREEN_SIZE_FOR_LEVEL[0] - width) // 2,
-                               (SCREEN_SIZE_FOR_LEVEL[1] - height) // 2))
+            width_text, height_text = text.get_width(), text.get_height()
+            screen.blit(text, ((SCREEN_SIZE_FOR_LEVEL[0] - width_text) // 2,
+                               (SCREEN_SIZE_FOR_LEVEL[1] - height_text) // 2))
             if counter % 20 == 0:
                 running = False
                 go_to_start_screen()
@@ -857,6 +1145,74 @@ def change_heroes_screen():
         pygame.display.flip()
         clock.tick(100)
         counter += 1
+
+
+def support_screen():
+    pygame.mixer.music.stop()
+    screen = pygame.display.set_mode(SCREEN_SIZE_FOR_LEVEL)
+    running = True
+    font_simple = pygame.font.Font('FreeSansBold.ttf', 40)
+    text = font_simple.render('Выйти', 1, (0, 0, 0))
+    exit_text_width = text.get_width()
+    exit_text_height = text.get_height()
+    surface = pygame.Surface((exit_text_width, exit_text_height))
+    surface.fill((150, 150, 150))
+    surface.blit(text, (0, 0))
+    buttons = pygame.sprite.Group()
+    exit_button = Button((SCREEN_SIZE_FOR_LEVEL[0] - exit_text_width) // 2,
+                         SCREEN_SIZE_FOR_LEVEL[1] - exit_text_height - 30,
+                         surface,
+                         buttons,
+                         lambda: go_to_start_screen())
+    main_font = pygame.font.Font('FreeSansBold.ttf', 16)
+    support_text = ['1) В этой игре вам доступны 10 локаций для прохождения',
+                    '2) Для победы вам надо найти выход и не попасться врагам.',
+                    '3) Выход скрыт среди разрушаемых (тёмных) стен, ',
+                    'чтобы его найти вам нужно разрушать их',
+                    '4) Выход (при открытии) обозначен квадратом желтого цвета',
+                    '5) Игрок (вы) обозначен квадратом синего цвета',
+                    '6) Враги обозначены красными треугольниками',
+                    '7) Ваши мины обозначены черными кругами',
+                    '8) Светлые стены неразрушимы',
+                    '',
+                    '',
+                    '#Вы можете подорваться на своих же минах и проиграть',
+                    '#На каждом уровне существует ограниченное число мест,',
+                    '#на месте которых при загрузке уровня появляется выход',
+                    '#При успешном прохождении каждой локации есть',
+                    '#вероятность открытия нового уровня вашего персонажа',
+                    '#Вероятность получения более высокого уровня ниже, ',
+                    '#чем более низкого. ',
+                    '#Все вероятности вам неизвестны, но вероятность получить',
+                    '#5 уровень персонажа равна 0.75%, λ-уровень — 0.01%.',
+                    '#Открытие нового уровня персонажа случайно, следовательно ',
+                    '#есть вероятность, что вы НИКОГДА не откроете',
+                    '#определенный уровень персонажа...']
+    colors = {'red': (255, 0, 0), 'white': (255, 255, 255)}
+    text = []
+    for line in support_text:
+        if line.startswith('#'):
+            text.append(main_font.render(line[1:], 1, colors['red']))
+        else:
+            text.append(main_font.render(line, 1, colors['white']))
+    while running:
+        screen.fill((0, 0, 0))
+        x = (SCREEN_SIZE_FOR_LEVEL[0] - max([line.get_width() for line in text])) // 2
+        y = 20
+        for line in text:
+            screen.blit(line, (x, y))
+            y += line.get_height() + 5
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if exit_button.press(event):
+                    running = False
+            elif event.type == pygame.MOUSEBUTTONUP:
+                exit_button.press(event)
+        buttons.draw(screen)
+        pygame.display.flip()
+        clock.tick(100)
 
 
 def add_new_hero_to_saves(level):
