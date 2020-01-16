@@ -95,7 +95,7 @@ def load_base_images(dictionary):
     dictionary['Player'] = load_image('animated_player_v3.png')
     dictionary['Shell'] = shell_image
     dictionary['Expansion'] = load_image('expansion.png')
-    dictionary['Background'] = load_image('background.png')
+    dictionary['Background'] = load_image('background.jpg')
     dictionary['Arrow_right'] = load_image('arrow_right.png')
     dictionary['Arrow_left'] = load_image('arrow_left.png')
     dictionary['Choose_level'] = load_image('choose_level.png')
