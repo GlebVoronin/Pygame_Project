@@ -4,7 +4,7 @@ import os
 import sys
 
 pygame.init()
-
+os.environ['SDL_VIDEO_CENTERED'] = '1'
 CELL_SIZE = {'X': 20, 'Y': 20}
 CELL_COUNT = {'X': 31, 'Y': 31}
 EXPANSION_TIME = 300  # милисекунд
