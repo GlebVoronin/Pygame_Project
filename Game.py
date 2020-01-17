@@ -1,9 +1,9 @@
 import pygame
 import random
 import os
-import sys
 
 pygame.init()
+pygame.display.set_caption('Mine Field')
 os.environ['SDL_VIDEO_CENTERED'] = '1'
 CELL_SIZE = {'X': 20, 'Y': 20}
 CELL_COUNT = {'X': 31, 'Y': 31}
@@ -415,7 +415,6 @@ class Board:
         if self.reload and self.reload - seconds_left <= 0:
             self.reload = 0
             self.current_shells_possible_use = int(self.shell_limit)
-            print(self.shell_limit)
 
     def print_end_game(self, screen):
         if self.stop:
@@ -618,13 +617,15 @@ class Board:
                                     del self.enemys[count]
                             self.map_list[index[1]][index[0]] = SYMB_FOR_GRASS
                     elif isinstance(sprite, Player):
-                        if sprite.rect.x == coord[0] and sprite.rect.y == coord[1]:
+                        if (abs(sprite.rect.x - coord[0]) < CELL_SIZE['X']
+                                and abs(sprite.rect.y - coord[1]) < CELL_SIZE['Y']):
                             self.end_game(False)
 
     def generate_new_level(self):
         self.map_list = load_level_from_file(f'levels\level_{self.level}.dat')
-
-        exits = []
+        num_indexes = sum(line.count('E') for line in self.map_list)
+        exit_index = random.randint(0, num_indexes - 1)
+        current_index = 0
         for row in range(len(self.map_list)):
             for col in range(len(self.map_list)):
                 if self.map_list[row][col] == SYMB_FOR_ENEMY:
@@ -639,7 +640,13 @@ class Board:
                     wall = WallBrickDestroyable(col * CELL_SIZE['X'], row * CELL_SIZE['Y'])
                     wall.add(self.all_sprites_group)
                 elif self.map_list[row][col] == SYMB_FOR_EXIT:
-                    exits.append((col, row))
+                    if current_index == exit_index:
+                        self.exit = Exit(col * CELL_SIZE['X'], row * CELL_SIZE['Y'])
+                        self.exit.add(self.all_sprites_group)
+                    else:
+                        wall = WallBrickDestroyable(col * CELL_SIZE['X'], row * CELL_SIZE['Y'])
+                        wall.add(self.all_sprites_group)
+                    current_index += 1
                 elif self.map_list[row][col] == SYMB_FOR_GRASS:
                     continue
                 elif self.map_list[row][col] == SYMB_FOR_PLAYER:
@@ -648,16 +655,6 @@ class Board:
                                          board=self,
                                          level=CURRENT_PLAYER_LEVEL)
                     self.player.add(self.all_sprites_group)
-        exit_index = random.randint(0, len(exits) - 1)
-
-        self.exit = Exit(exits[exit_index][0] * CELL_SIZE['X'],
-                         exits[exit_index][1] * CELL_SIZE['Y'])
-        self.exit.add(self.all_sprites_group)
-        del exits[exit_index]
-        for coords in exits:
-            wall = WallBrickDestroyable(coords[0] * CELL_SIZE['X'], coords[1] * CELL_SIZE['Y'])
-            wall.add(self.all_sprites_group)
-            self.map_list[coords[1]][coords[0]] = SYMB_FOR_DESTROYABLE_WALL
 
 
 class Player(pygame.sprite.Sprite):
@@ -819,10 +816,6 @@ def start_game(level):
                     if counter % 2 == 0:
                         enemy.update_frame(enemy_move[2], enemy_move[3])
                     check_coordinates_and_rewrite_that(enemy, enemy_move)
-            if keys[pygame.K_LCTRL]:
-                [print(i) for i in board.map_list]
-                [print(en.index) for en in board.enemys]
-                print(999999999999999999)
         if board.expansion_sprites:
             for sprite in board.expansion_sprites:
                 sprite.update()
